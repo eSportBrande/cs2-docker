@@ -89,6 +89,18 @@ for entry in "$MASTER_DIR"/game/csgo/*; do
 done
 mkdir -p "$SCRATCH_CSGO/cfg" "$SCRATCH_CSGO/addons" "$SCRATCH_CSGO/logs" "$SCRATCH_CSGO/demos"
 
+# gameinfo.gi must be a REAL file in the writable scratch csgo, not a symlink to
+# master: Source 2 derives the mod's writable base from the real path of
+# gameinfo.gi, so if it points into the read-only master, per-round backups
+# (backup_roundNN.txt) and similar writes fail with "Failed to write ...". Copy
+# it (removing the symlink first so we don't write through it into master).
+for gi in "$MASTER_DIR"/game/csgo/gameinfo*.gi; do
+  [ -e "$gi" ] || continue
+  dst="$SCRATCH_CSGO/$(basename "$gi")"
+  rm -f "$dst"
+  cp "$gi" "$dst"
+done
+
 # Seed cfg from master (per-file symlinks so custom cfg can override) then layer
 # our baked-in custom files on top without touching the master.
 if [ -d "$MASTER_DIR/game/csgo/cfg" ]; then
