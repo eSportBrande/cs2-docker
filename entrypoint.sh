@@ -139,6 +139,13 @@ fi
 # shellcheck disable=SC2206
 [ -n "${CSGO_PARAMS:-}" ] && args+=( ${CSGO_PARAMS} )
 
+# CS2's server module (game/csgo/bin/linuxsteamrt64/libserver.so) depends on
+# engine libs like libv8.so that live in game/bin/linuxsteamrt64 — a different
+# directory not on libserver.so's RUNPATH. Launching the binary directly (rather
+# than via CS2's own launcher) means we must put those dirs on the loader path,
+# or startup dies with "libserver.so: libv8.so: cannot open shared object file".
+export LD_LIBRARY_PATH="$POD_GAME/bin/linuxsteamrt64:$POD_GAME/csgo/bin/linuxsteamrt64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
 cd "$POD_GAME"
 log "launching cs2 on port $PORT (map ${CSGO_MAP:-de_dust2})"
 exec "$CS2_BIN" "${args[@]}"
