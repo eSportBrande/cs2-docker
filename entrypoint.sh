@@ -137,6 +137,50 @@ if [ -d "$CUSTOM_FILES_DIR" ]; then
   rsync -a --no-perms --no-owner --no-group "$CUSTOM_FILES_DIR"/ "$POD_CSGO"/ || true
 fi
 
+# ---- server-type setup steps (mod installs) --------------------------------
+# GAAS_SETUP_STEPS is a JSON list the operator injects from the game template.
+# Each step downloads/extracts a plugin or runs a command in the game dir,
+# before the server launches. Paths in "to" are relative to the game dir; step
+# strings may reference container env vars ($VAR).
+run_setup_steps() {
+  local steps="${GAAS_SETUP_STEPS:-}"
+  [ -z "$steps" ] && return 0
+  command -v jq >/dev/null || fail "GAAS_SETUP_STEPS set but jq is not installed"
+  local n i dl ex rn to tmp
+  n=$(printf '%s' "$steps" | jq 'length')
+  log "running $n setup step(s)"
+  for ((i = 0; i < n; i++)); do
+    dl=$(printf '%s' "$steps" | jq -r ".[$i].download // empty")
+    ex=$(printf '%s' "$steps" | jq -r ".[$i].extract // empty")
+    rn=$(printf '%s' "$steps" | jq -r ".[$i].run // empty")
+    to=$(printf '%s' "$steps" | jq -r ".[$i].to // empty")
+    to=$(eval echo "\"$to\"")
+    if [ -n "$dl" ]; then
+      dl=$(eval echo "\"$dl\"")
+      log "setup[$i]: download -> $to"
+      mkdir -p "$(dirname "$to")"
+      curl -fSL -o "$to" "$dl"
+    elif [ -n "$ex" ]; then
+      ex=$(eval echo "\"$ex\"")
+      log "setup[$i]: extract -> $to"
+      mkdir -p "$to"
+      tmp=$(mktemp)
+      curl -fSL -o "$tmp" "$ex"
+      case "$ex" in
+        *.zip) unzip -oq "$tmp" -d "$to" ;;
+        *.tar.gz | *.tgz) tar xzf "$tmp" -C "$to" ;;
+        *.tar) tar xf "$tmp" -C "$to" ;;
+        *) fail "setup[$i]: unknown archive type for $ex" ;;
+      esac
+      rm -f "$tmp"
+    elif [ -n "$rn" ]; then
+      log "setup[$i]: run"
+      bash -c "$rn"
+    fi
+  done
+}
+( cd "$POD_GAME" && run_setup_steps )
+
 # ---- assemble the launch command -------------------------------------------
 # CS2 dedicated server binary (64-bit). The exact runtime wiring (Steam Linux
 # Runtime) must be validated on a real node — see README.
@@ -144,6 +188,15 @@ CS2_BIN="$POD_GAME/bin/linuxsteamrt64/cs2"
 [ -x "$CS2_BIN" ] || fail "cs2 binary not found/executable at $CS2_BIN (verify CS2 install layout)"
 
 PORT="${CSGO_PORT:-27015}"
+
+# CSGO_GAMEMODE packs Valve's game_type and game_mode as "type:mode" (one panel
+# dropdown); split it. Falls back to CSGO_GAME_TYPE/CSGO_GAME_MODE if a template
+# sets those directly, else competitive (0/1).
+if [ -n "${CSGO_GAMEMODE:-}" ]; then
+  CSGO_GAME_TYPE="${CSGO_GAMEMODE%%:*}"
+  CSGO_GAME_MODE="${CSGO_GAMEMODE##*:}"
+fi
+
 args=(
   -dedicated -console -usercon
   +ip "${CSGO_IP:-0.0.0.0}"

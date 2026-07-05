@@ -27,13 +27,17 @@ RUN dpkg --add-architecture i386 \
 # --- final runtime image ---
 FROM debian:bookworm-slim
 
-# Runtime deps: certs for any HTTPS the server does, rsync for custom-file sync,
-# tini as a minimal init so signals reach the game process.
+# Runtime deps: certs for HTTPS, rsync for custom-file sync, tini as a minimal
+# init so signals reach the game process, and curl/jq/unzip so server-type
+# setup steps (mod installs) can download + unpack plugins on start.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         rsync \
         tini \
+        curl \
+        jq \
+        unzip \
         libncurses6 \
         libtinfo6 \
     && rm -rf /var/lib/apt/lists/*
