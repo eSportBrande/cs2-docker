@@ -54,16 +54,40 @@ mkdir -p "$SCRATCH_DIR" "$POD_BASE"
 rm -rf "$POD_GAME"
 mkdir -p "$POD_GAME"
 
-# Top-level of 'game' (bin, core, engine ..., plus the 'csgo' content dir): the
+# Top-level of 'game' (core, engine ..., plus the 'csgo' content dir): the
 # static engine directories are symlinked from master; 'csgo' is handled below
-# because it holds both static content (maps/pak) and writable state.
+# because it holds both static content (maps/pak) and writable state, and 'bin'
+# is handled below because the cs2 binary must be a real file (see there).
 for entry in "$MASTER_DIR"/game/*; do
   name="$(basename "$entry")"
-  if [ "$name" = "csgo" ]; then
+  if [ "$name" = "csgo" ] || [ "$name" = "bin" ]; then
     continue
   fi
   ln -snf "$entry" "$POD_GAME/$name"
 done
+
+# The 'bin' dir: real directories with per-file symlinks, and the cs2 binary as
+# a REAL COPY (151K launcher). The engine derives its root — and thus EVERY
+# write path (round backups, boot.vcfg, logs) — from realpath(/proc/self/exe).
+# If the binary resolves through a symlink into the read-only master, all
+# engine writes target the master and fail ("Failed to write backup_round01.txt").
+# Proven with strace: symlinked exe -> writes at master; real exe -> writes in
+# this tree (through the csgo symlink into the writable scratch).
+mkdir -p "$POD_GAME/bin/linuxsteamrt64"
+for entry in "$MASTER_DIR"/game/bin/*; do
+  name="$(basename "$entry")"
+  if [ "$name" = "linuxsteamrt64" ]; then
+    continue
+  fi
+  ln -snf "$entry" "$POD_GAME/bin/$name"
+done
+for entry in "$MASTER_DIR"/game/bin/linuxsteamrt64/*; do
+  ln -snf "$entry" "$POD_GAME/bin/linuxsteamrt64/$(basename "$entry")"
+done
+rm -f "$POD_GAME/bin/linuxsteamrt64/cs2"
+cp "$MASTER_DIR/game/bin/linuxsteamrt64/cs2" "$POD_GAME/bin/linuxsteamrt64/cs2"
+[ -f "$POD_GAME/bin/linuxsteamrt64/cs2" ] && [ ! -L "$POD_GAME/bin/linuxsteamrt64/cs2" ] \
+  || fail "cs2 binary was not copied as a real file"
 
 # The 'csgo' content dir: create a real dir in scratch, symlink static content
 # from master, and keep writable subdirs (cfg/addons/logs/demos/replays) real.
