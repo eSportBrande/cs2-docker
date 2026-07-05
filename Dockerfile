@@ -40,6 +40,7 @@ RUN apt-get update \
         unzip \
         libncurses6 \
         libtinfo6 \
+        libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Unprivileged runtime user. UID matches the operator/pod securityContext.
