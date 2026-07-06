@@ -208,12 +208,15 @@ args=(
 [ -n "${CSGO_MAX_PLAYERS:-}" ] && args+=( +sv_visiblemaxplayers "$CSGO_MAX_PLAYERS" )
 [ -n "${CSGO_HOSTNAME:-}" ]    && args+=( +hostname "$CSGO_HOSTNAME" )
 
-# GSLT: required for public servers; without it, run LAN-only.
+# GSLT registers the server under a persistent Steam game-server account;
+# without one we log in anonymously. Do NOT force +sv_lan 1 here: server.cfg
+# sets sv_lan 0, and flipping sv_lan mid-first-spawn makes the engine drop its
+# game UDP socket — a deaf server (status: spawn 1, no udp/ip line) until a
+# manual changelevel forces a clean second spawn. Verified 2026-07-06.
 if [ -n "${CSGO_GSLT:-}" ]; then
   args+=( +sv_setsteamaccount "$CSGO_GSLT" )
 else
-  log "no CSGO_GSLT set -> LAN only (+sv_lan 1)"
-  args+=( +sv_lan 1 )
+  log "no CSGO_GSLT set -> anonymous game server account"
 fi
 
 # RCON: drive the password ONLY from env (never from a cfg that hardcodes it).
