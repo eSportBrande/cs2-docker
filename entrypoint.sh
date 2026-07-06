@@ -207,6 +207,8 @@ args=(
 )
 [ -n "${CSGO_MAX_PLAYERS:-}" ] && args+=( +sv_visiblemaxplayers "$CSGO_MAX_PLAYERS" )
 [ -n "${CSGO_HOSTNAME:-}" ]    && args+=( +hostname "$CSGO_HOSTNAME" )
+# Join password (sv_password); empty/unset leaves the server open.
+[ -n "${CSGO_PASSWORD:-}" ]    && args+=( +sv_password "$CSGO_PASSWORD" )
 
 # GSLT registers the server under a persistent Steam game-server account;
 # without one we log in anonymously. Do NOT force +sv_lan 1 here: server.cfg
