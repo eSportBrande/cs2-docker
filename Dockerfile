@@ -14,7 +14,7 @@
 # is derived from).
 
 # --- build stage: produce steamclient.so (discarded; not in the final image) ---
-FROM debian:bookworm-slim AS steam
+FROM debian:trixie-slim AS steam
 RUN dpkg --add-architecture i386 \
     && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl lib32gcc-s1 \
@@ -25,7 +25,7 @@ RUN dpkg --add-architecture i386 \
     && test -f /steamcmd/linux64/steamclient.so   # fail the build loudly if it's missing
 
 # --- final runtime image ---
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # Runtime deps: certs for HTTPS, rsync for custom-file sync, tini as a minimal
 # init so signals reach the game process, and curl/jq/unzip so server-type
